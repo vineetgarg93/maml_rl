@@ -44,6 +44,7 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
             std_parametrization='exp',
             grad_step_size=1.0,
             stop_grad=False,
+            is_protagonist=True
     ):
         """
         :param env_spec:
@@ -70,7 +71,11 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
         assert isinstance(env_spec.action_space, Box)
 
         obs_dim = env_spec.observation_space.flat_dim
-        self.action_dim = env_spec.action_space.flat_dim
+        if is_protagonist==True:
+            self.action_dim = env_spec.pro_action_space.flat_dim
+        else:
+            self.action_dim = env_spec.adv_action_space.flat_dim
+        # self.action_dim = env_spec.action_space.flat_dim
         self.n_hidden = len(hidden_sizes)
         self.hidden_nonlinearity = hidden_nonlinearity
         self.output_nonlinearity = output_nonlinearity

@@ -25,8 +25,10 @@ class BatchMAMLPolopt(RLAlgorithm):
     def __init__(
             self,
             env,
-            policy,
-            baseline,
+            pro_policy,
+            pro_baseline,
+            adv_policy,
+            adv_baseline,
             scope=None,
             n_itr=500,
             start_itr=0,
@@ -50,6 +52,7 @@ class BatchMAMLPolopt(RLAlgorithm):
             force_batch_sampler=False,
             use_maml=True,
             load_policy=None,
+            is_protagonist=True,
             **kwargs
     ):
         """
@@ -76,9 +79,11 @@ class BatchMAMLPolopt(RLAlgorithm):
         :return:
         """
         self.env = env
-        self.policy = policy
+        self.pro_policy = pro_policy
+        self.pro_baseline = pro_baseline
         self.load_policy=load_policy
-        self.baseline = baseline
+        self.adv_policy = adv_policy
+        self.adv_baseline = adv_baseline
         self.scope = scope
         self.n_itr = n_itr
         self.start_itr = start_itr
@@ -97,7 +102,7 @@ class BatchMAMLPolopt(RLAlgorithm):
         self.fixed_horizon = fixed_horizon
         self.meta_batch_size = meta_batch_size # number of tasks
         self.num_grad_updates = num_grad_updates # number of gradient steps during training
-
+        self.is_protagonist = is_protagonist
         if sampler_cls is None:
             if singleton_pool.n_parallel > 1:
                 sampler_cls = BatchSampler
@@ -107,6 +112,12 @@ class BatchMAMLPolopt(RLAlgorithm):
             sampler_args = dict()
         sampler_args['n_envs'] = self.meta_batch_size
         self.sampler = sampler_cls(self, **sampler_args)
+        if self.is_protagonist==True:
+            self.policy = self.pro_policy
+            self.baseline = self.pro_baseline
+        else:
+            self.policy = self.adv_policy
+            self.baseline = self.adv_baseline
 
     def start_worker(self):
         self.sampler.start_worker()
@@ -167,7 +178,8 @@ class BatchMAMLPolopt(RLAlgorithm):
                         #    import pdb; pdb.set_trace() # test param_vals functions.
                         logger.log('** Step ' + str(step) + ' **')
                         logger.log("Obtaining samples...")
-                        paths = self.obtain_samples(itr, reset_args=learner_env_goals, log_prefix=str(step))
+                        paths_1 = self.obtain_samples(itr, reset_args=learner_env_goals, log_prefix=str(step))
+                        paths = self.get_agent_paths(paths_1, is_protagonist=self.is_protagonist)
                         all_paths.append(paths)
                         logger.log("Processing samples...")
                         samples_data = {}
@@ -251,9 +263,35 @@ class BatchMAMLPolopt(RLAlgorithm):
                             plt.savefig(osp.join(logger.get_snapshot_dir(), 'swim1d_prepost_itr'+str(itr)+'_id'+str(ind)+'.pdf'))
         self.shutdown_worker()
 
+    
+    def get_agent_paths(self, paths, is_protagonist=True):
+        cur_paths = copy(paths)
+        for p in cur_paths:
+            if is_protagonist==True:
+                p['actions']=p.pop('pro_actions')
+                del p['adv_actions']
+                p['agent_infos']=p.pop('pro_agent_infos')
+                del p['adv_agent_infos']
+            else:
+                alpha = -1.0
+                p['actions']=p.pop('adv_actions')
+                del p['pro_actions']
+                p['rewards']=alpha*p['rewards']
+                p['agent_infos']=p.pop('adv_agent_infos')
+                del p['pro_agent_infos']
+        return cur_paths
+
+
+    def get_average_reward(self, paths):
+        sum_r = 0.0
+        for p in paths:
+            sum_r +=p['rewards'].sum()
+        return sum_r/len(paths)
+
+
     def log_diagnostics(self, paths, prefix):
-        self.env.log_diagnostics(paths, prefix)
-        self.policy.log_diagnostics(paths, prefix)
+        self.env.log_diagnostics(paths)
+        self.policy.log_diagnostics(paths)
         self.baseline.log_diagnostics(paths)
 
     def init_opt(self):

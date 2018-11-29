@@ -40,7 +40,7 @@ class MAMLNPO(BatchMAMLPolopt):
         self.kl_constrain_step = -1  # needs to be 0 or -1 (original pol params, or new pol params)
         super(MAMLNPO, self).__init__(**kwargs)
 
-    def make_vars(self, stepnum='0'):
+    def make_vars(self, stepnum='0', is_protagonist = True):
         # lists over the meta_batch_size
         obs_vars, action_vars, adv_vars = [], [], []
         for i in range(self.meta_batch_size):
@@ -48,10 +48,16 @@ class MAMLNPO(BatchMAMLPolopt):
                 'obs' + stepnum + '_' + str(i),
                 extra_dims=1,
             ))
-            action_vars.append(self.env.action_space.new_tensor_variable(
-                'action' + stepnum + '_' + str(i),
-                extra_dims=1,
-            ))
+            if is_protagonist == True:
+                action_vars.append(self.env.pro_action_space.new_tensor_variable(
+                    'action' + stepnum + '_' + str(i),
+                    extra_dims=1,
+                ))
+            else:
+                action_vars.append(self.env.adv_action_space.new_tensor_variable(
+                    'action' + stepnum + '_' + str(i),
+                    extra_dims=1,
+                ))
             adv_vars.append(tensor_utils.new_tensor(
                 name='advantage' + stepnum + '_' + str(i),
                 ndim=1, dtype=tf.float32,
@@ -59,7 +65,7 @@ class MAMLNPO(BatchMAMLPolopt):
         return obs_vars, action_vars, adv_vars
 
     @overrides
-    def init_opt(self):
+    def init_opt(self, is_protagonist = True):
         is_recurrent = int(self.policy.recurrent)
         assert not is_recurrent  # not supported
 
@@ -78,7 +84,7 @@ class MAMLNPO(BatchMAMLPolopt):
         all_surr_objs, input_list = [], []
         new_params = None
         for j in range(self.num_grad_updates):
-            obs_vars, action_vars, adv_vars = self.make_vars(str(j))
+            obs_vars, action_vars, adv_vars = self.make_vars(str(j), is_protagonist)
             surr_objs = []
 
             cur_params = new_params
@@ -109,7 +115,7 @@ class MAMLNPO(BatchMAMLPolopt):
 
             all_surr_objs.append(surr_objs)
 
-        obs_vars, action_vars, adv_vars = self.make_vars('test')
+        obs_vars, action_vars, adv_vars = self.make_vars('test', is_protagonist)
         surr_objs = []
         for i in range(self.meta_batch_size):
             dist_info_vars, _ = self.policy.updated_dist_info_sym(i, all_surr_objs[-1][i], obs_vars[i], params_dict=new_params[i])
