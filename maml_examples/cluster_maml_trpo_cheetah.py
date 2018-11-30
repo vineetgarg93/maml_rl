@@ -1,6 +1,7 @@
 
 from sandbox.rocky.tf.algos.maml_trpo import MAMLTRPO
 from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
+from rllab.envs.gym_env import GymEnv
 from rllab.baselines.gaussian_mlp_baseline import GaussianMLPBaseline
 from rllab.envs.mujoco.half_cheetah_env_rand import HalfCheetahEnvRand
 from rllab.envs.mujoco.half_cheetah_env_rand_direc import HalfCheetahEnvRandDirec
@@ -57,9 +58,10 @@ for v in variants:
     learning_rate = v['meta_step_size']
 
     if direc:
-        env = TfEnv(normalize(HalfCheetahEnvRandDirec()))
+        env = TfEnv(normalize(GymEnv('HalfCheetahAdv-v1', 1.0))) #TODO: need to change this case 
     else:
-        env = TfEnv(normalize(HalfCheetahEnvRand()))
+        env = TfEnv(normalize(GymEnv('HalfCheetahAdv-v1', 1.0))) #TODO: need to change this case
+
     policy = MAMLGaussianMLPPolicy(
         name="policy",
         env_spec=env.spec,

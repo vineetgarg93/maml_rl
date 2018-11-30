@@ -1,9 +1,7 @@
 import gym
-import gym.wrappers
 import gym.envs
 import gym.spaces
-from gym.monitoring import monitor_manager
-from gym.wrappers.monitoring import _Monitor
+from gym.monitoring import monitor
 import os
 import os.path as osp
 from rllab.envs.base import Env, Step
@@ -28,7 +26,7 @@ def convert_gym_space(space):
 
 class CappedCubicVideoSchedule(object):
     def __call__(self, count):
-        return monitor_manager.capped_cubic_video_schedule(count)
+        return monitor.capped_cubic_video_schedule(count)
 
 
 class FixedIntervalVideoSchedule(object):
@@ -45,8 +43,7 @@ class NoVideoSchedule(object):
 
 
 class GymEnv(Env, Serializable):
-    def __init__(self, env_name, record_video=True, video_schedule=None, log_dir=None, record_log=True,
-                 force_reset=False):
+    def __init__(self, env_name, adv_fraction=1.0, record_video=True, video_schedule=None, log_dir=None, record_log=True):
         if log_dir is None:
             if logger.get_snapshot_dir() is None:
                 logger.log("Warning: skipping Gym environment monitoring since snapshot_dir not configured.")
@@ -55,10 +52,13 @@ class GymEnv(Env, Serializable):
         Serializable.quick_init(self, locals())
 
         env = gym.envs.make(env_name)
+        def_adv = env.adv_action_space.high[0]
+        new_adv = def_adv*adv_fraction
+        env.update_adversary(new_adv)
         self.env = env
         self.env_id = env.spec.id
 
-        monitor_manager.logger.setLevel(logging.WARNING)
+        monitor.logger.setLevel(logging.WARNING)
 
         assert not (not record_log and record_video)
 
@@ -70,33 +70,38 @@ class GymEnv(Env, Serializable):
             else:
                 if video_schedule is None:
                     video_schedule = CappedCubicVideoSchedule()
-            self.env = gym.wrappers.Monitor(self.env, log_dir, video_callable=video_schedule, force=True)
+            self.env.monitor.start(log_dir, video_schedule, force=True)  # add 'force=True' if want overwrite dirs
             self.monitoring = True
 
         self._observation_space = convert_gym_space(env.observation_space)
-        self._action_space = convert_gym_space(env.action_space)
+        self._pro_action_space = convert_gym_space(env.pro_action_space)
+        self._adv_action_space = convert_gym_space(env.adv_action_space)
         self._horizon = env.spec.timestep_limit
         self._log_dir = log_dir
-        self._force_reset = force_reset
 
     @property
     def observation_space(self):
         return self._observation_space
 
     @property
-    def action_space(self):
-        return self._action_space
+    def pro_action_space(self):
+        return self._pro_action_space
+
+    @property
+    def adv_action_space(self):
+        return self._adv_action_space
 
     @property
     def horizon(self):
         return self._horizon
 
-    def reset(self, **kwargs):
-        if self._force_reset and self.monitoring:
-            recorder = self.env._monitor.stats_recorder
-            if recorder is not None:
-                recorder.done = True
-        return self.env.reset()
+    def reset(self,reset_args=None):
+        if hasattr(self.env, 'monitor'):
+            if hasattr(self.env.monitor, 'stats_recorder'):
+                recorder = self.env.monitor.stats_recorder
+                if recorder is not None:
+                    recorder.done = True
+        return self.env.reset() #TODO: add reset_args as argument when using for sample goals
 
     def step(self, action):
         next_obs, reward, done, info = self.env.step(action)
@@ -107,7 +112,7 @@ class GymEnv(Env, Serializable):
 
     def terminate(self):
         if self.monitoring:
-            self.env._close()
+            self.env.monitor.close()
             if self._log_dir is not None:
                 print("""
     ***************************

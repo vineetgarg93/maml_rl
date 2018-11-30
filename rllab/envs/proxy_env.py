@@ -12,9 +12,17 @@ class ProxyEnv(Env):
     def reset(self, *args, **kwargs):
         return self._wrapped_env.reset(*args, **kwargs)
 
+    # @property
+    # def action_space(self):
+    #     return self._wrapped_env.action_space
+
     @property
-    def action_space(self):
-        return self._wrapped_env.action_space
+    def pro_action_space(self):
+        return self._wrapped_env.pro_action_space
+
+    @property
+    def adv_action_space(self):
+        return self._wrapped_env.adv_action_space
 
     @property
     def observation_space(self):
