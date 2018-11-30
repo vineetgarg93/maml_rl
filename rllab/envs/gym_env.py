@@ -95,6 +95,9 @@ class GymEnv(Env, Serializable):
     def horizon(self):
         return self._horizon
 
+    def sample_goals(self, num_goals):
+        return self.env.sample_goals(num_goals)
+
     def reset(self,reset_args=None):
         if hasattr(self.env, 'monitor'):
             if hasattr(self.env.monitor, 'stats_recorder'):
