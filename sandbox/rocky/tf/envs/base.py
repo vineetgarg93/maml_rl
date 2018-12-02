@@ -35,15 +35,24 @@ class TfEnv(ProxyEnv):
     def observation_space(self):
         return to_tf_space(self.wrapped_env.observation_space)
 
+    # @cached_property
+    # def action_space(self):
+    #     return to_tf_space(self.wrapped_env.action_space)
+
     @cached_property
-    def action_space(self):
-        return to_tf_space(self.wrapped_env.action_space)
+    def pro_action_space(self):
+        return to_tf_space(self.wrapped_env.pro_action_space)
+
+    @cached_property
+    def adv_action_space(self):
+        return to_tf_space(self.wrapped_env.adv_action_space)
 
     @cached_property
     def spec(self):
         return EnvSpec(
             observation_space=self.observation_space,
-            action_space=self.action_space,
+            pro_action_space=self.pro_action_space,
+            adv_action_space=self.adv_action_space
         )
 
     @property
