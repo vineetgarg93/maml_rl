@@ -128,7 +128,7 @@ for v in variants:
     for ni in range(10):
         logger.log('\n\n\n####global itr# {} ####\n\n\n'.format(ni))
         ## Train protagonist
-#        pro_algo.train()
+        pro_algo.train()
         # pro_rews += pro_algo.rews; all_rews += pro_algo.rews;
         # logger.log('Protag Reward: {}'.format(np.array(pro_algo.rews).mean()))
         ## Train Adversary
