@@ -84,7 +84,7 @@ class MAMLNPO(BatchMAMLPolopt):
         all_surr_objs, input_list = [], []
         new_params = None
         for j in range(self.num_grad_updates):
-            obs_vars, action_vars, adv_vars = self.make_vars(str(j), is_protagonist)
+            obs_vars, action_vars, adv_vars = self.make_vars(str(j), self.is_protagonist)
             surr_objs = []
 
             cur_params = new_params
@@ -115,7 +115,7 @@ class MAMLNPO(BatchMAMLPolopt):
 
             all_surr_objs.append(surr_objs)
 
-        obs_vars, action_vars, adv_vars = self.make_vars('test', is_protagonist)
+        obs_vars, action_vars, adv_vars = self.make_vars('test', self.is_protagonist)
         surr_objs = []
         for i in range(self.meta_batch_size):
             dist_info_vars, _ = self.policy.updated_dist_info_sym(i, all_surr_objs[-1][i], obs_vars[i], params_dict=new_params[i])

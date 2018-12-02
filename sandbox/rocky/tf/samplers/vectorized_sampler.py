@@ -64,7 +64,9 @@ class VectorizedSampler(BaseSampler):
         env_time = 0
         process_time = 0
 
-        policy = self.algo.policy
+#        policy = self.algo.policy
+        pro_policy = self.algo.pro_policy
+        adv_policy = self.algo.adv_policy
         import time
 
 
@@ -87,9 +89,11 @@ class VectorizedSampler(BaseSampler):
             env_infos = tensor_utils.split_tensor_dict_list(env_infos)
             if env_infos is None:
                 env_infos = [dict() for _ in range(self.vec_env.num_envs)]
-            if agent_infos is None:
-                agent_infos = [dict() for _ in range(self.vec_env.num_envs)]
-            for idx, observation, pro_action, adv_action,, reward, env_info, pro_agent_info, adv_agent_info, done in zip(itertools.count(), obses, pro_actions,
+            if pro_agent_infos is None:
+                pro_agent_infos = [dict() for _ in range(self.vec_env.num_envs)]
+            if adv_agent_infos is None:
+                adv_agent_infos = [dict() for _ in range(self.vec_env.num_envs)]
+            for idx, observation, pro_action, adv_action, reward, env_info, pro_agent_info, adv_agent_info, done in zip(itertools.count(), obses, pro_actions,
                                                                                     adv_actions, rewards, env_infos, pro_agent_infos, adv_agent_infos,
                                                                                     dones):
                 if running_paths[idx] is None:

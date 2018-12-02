@@ -15,6 +15,8 @@ from sandbox.rocky.tf.samplers.batch_sampler import BatchSampler
 from sandbox.rocky.tf.samplers.vectorized_sampler import VectorizedSampler
 from sandbox.rocky.tf.spaces import Discrete
 from rllab.sampler.stateful_pool import singleton_pool
+import copy
+import numpy as np
 
 class BatchMAMLPolopt(RLAlgorithm):
     """
@@ -64,7 +66,7 @@ class BatchMAMLPolopt(RLAlgorithm):
         simultaneously, each using different environments and policies
         :param n_itr: Number of iterations.
         :param start_itr: Starting iteration.
-        :param batch_size: Number of samples per iteration.  #
+        :param batchprocess_time_size: Number of samples per iteration.  #
         :param max_path_length: Maximum length of a single rollout.
         :param meta_batch_size: Number of tasks sampled per meta-update
         :param num_grad_updates: Number of fast gradient updates
@@ -128,7 +130,7 @@ class BatchMAMLPolopt(RLAlgorithm):
         self.sampler.shutdown_worker()
 
     def obtain_samples(self, itr, reset_args=None, log_prefix=''):
-        # This obtains samples using self.policy, and calling policy.get_actions(obses)
+        # This obtains samples using 0.4self.policy, and calling policy.get_actions(obses)
         # return_dict specifies how the samples should be returned (dict separates samples
         # by task)
         paths = self.sampler.obtain_samples(itr, reset_args, return_dict=True, log_prefix=log_prefix)
@@ -265,21 +267,53 @@ class BatchMAMLPolopt(RLAlgorithm):
 
     
     def get_agent_paths(self, paths, is_protagonist=True):
-        cur_paths = copy(paths)
-        for p in cur_paths:
-            if is_protagonist==True:
-                p['actions']=p.pop('pro_actions')
-                del p['adv_actions']
-                p['agent_infos']=p.pop('pro_agent_infos')
-                del p['adv_agent_infos']
-            else:
-                alpha = -1.0
-                p['actions']=p.pop('adv_actions')
-                del p['pro_actions']
-                p['rewards']=alpha*p['rewards']
-                p['agent_infos']=p.pop('adv_agent_infos')
-                del p['pro_agent_infos']
+        cur_paths = copy.deepcopy(paths)
+        
+        if is_protagonist==True:
+            for meta_task in cur_paths.keys():
+                for pp in cur_paths[meta_task]:
+                    pp['actions']=pp.pop('pro_actions')
+                    del pp['adv_actions']
+                    pp['agent_infos']=pp.pop('pro_agent_infos')
+                    del pp['adv_agent_infos']
+#                    break
+#                break
+        else:
+            alpha = -1.0
+            for meta_task in cur_paths.keys():
+                for pp in cur_paths[meta_task]:
+                    pp['actions']=pp.pop('adv_actions')
+                    del pp['pro_actions']
+                    pp['rewards']=alpha*pp['rewards']
+                    pp['agent_infos']=pp.pop('adv_agent_infos')
+                    del pp['pro_agent_infos']
+#                    break
+#                break
+#            for meta_task in cur_paths.keys():
+#                for pp in cur_paths[meta_task]:
+#                    for key in pp.keys():
+#                        if key == 'rewards':
+#                            pp[key] = list(np.negative(np.array(pp[key])))
+        
         return cur_paths
+
+        
+        
+#        cur_paths = copy(paths)
+#        for p in cur_paths:
+#            if is_protagonist==True:
+#                p['actions']=p.pop('pro_actions')
+#                del p['adv_actions']
+#                p['agent_infos']=p.pop('pro_agent_infos')
+#                del p['adv_agent_infos']
+#            else:
+#                alpha = -1.0
+#                p['actions']=p.pop('adv_actions')
+#                del p['pro_actions']
+#                p['rewards']=alpha*p['rewards']
+#                p['agent_infos']=p.pop('adv_agent_infos')
+#                del p['pro_agent_infos']
+#        return cur_paths
 
 
     def get_average_reward(self, paths):
