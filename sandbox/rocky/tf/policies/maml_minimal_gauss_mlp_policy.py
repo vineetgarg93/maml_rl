@@ -68,7 +68,8 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
         :return:
         """
         Serializable.quick_init(self, locals())
-        assert isinstance(env_spec.action_space, Box)
+        assert isinstance(env_spec.pro_action_space, Box)
+        assert isinstance(env_spec.adv_action_space, Box)
 
         obs_dim = env_spec.observation_space.flat_dim
         if is_protagonist==True:
@@ -82,20 +83,21 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
         self.input_shape = (None, obs_dim,)
         self.step_size = grad_step_size
         self.stop_grad = stop_grad
+        self.is_protagonist = is_protagonist
         if type(self.step_size) == list:
             raise NotImplementedError('removing this since it didnt work well')
 
         # create network
         if mean_network is None:
             self.all_params = self.create_MLP(  # TODO: this should not be a method of the policy! --> helper
-                name="mean_network",
+                name="mean_network"+"_"+str(self.is_protagonist),
                 output_dim=self.action_dim,
                 hidden_sizes=hidden_sizes,
             )
-            self.input_tensor, _ = self.forward_MLP('mean_network', self.all_params,
+            self.input_tensor, _ = self.forward_MLP('mean_network'+"_"+str(self.is_protagonist), self.all_params,
                 reuse=None # Need to run this for batch norm
             )
-            forward_mean = lambda x, params, is_train: self.forward_MLP('mean_network', params,
+            forward_mean = lambda x, params, is_train: self.forward_MLP('mean_network'+"_"+str(self.is_protagonist), params,
                 input_tensor=x, is_training=is_train)[1]
         else:
             raise NotImplementedError('Not supported.')
@@ -115,7 +117,7 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
                 self.all_params['std_param'] = make_param_layer(
                     num_units=self.action_dim,
                     param=tf.constant_initializer(init_std_param),
-                    name="output_std_param",
+                    name="output_std_param"+"_"+str(self.is_protagonist),
                     trainable=learn_std,
                 )
                 forward_std = lambda x, params: forward_param_layer(x, params['std_param'])
@@ -344,7 +346,7 @@ class MAMLGaussianMLPPolicy(StochasticPolicy, Serializable):
         else:
             params = tf.global_variables()
 
-        params = [p for p in params if p.name.startswith('mean_network') or p.name.startswith('output_std_param')]
+        params = [p for p in params if p.name.startswith('mean_network'+"_"+str(self.is_protagonist)) or p.name.startswith('output_std_param'+"_"+str(self.is_protagonist))]
         params = [p for p in params if 'Adam' not in p.name]
 
         return params
