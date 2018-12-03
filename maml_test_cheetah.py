@@ -204,11 +204,9 @@ for v in variants:
         if ni!=0 and ni%save_every==0:
             ## SAVING CHECKPOINT INFO ##
             pickle.dump({'args': args,
-                         'pro_policy': pro_policy,
-                         'adv_policy': adv_policy,
-                         'zero_test': const_test_rew_summary,
+                         'zero_test': const_testing_rews,
                          'iter_save': ni,
-                         'adv_test': adv_test_rew_summary}, open(save_name+"_"+str(ni)+'.temp','wb'))
+                         'adv_test': adv_testing_rews}, open(save_name+"_"+str(ni)+'.temp','wb'))
 #    
 #    ## Shutting down the optimizer ##
 #    pro_algo.shutdown_worker()
