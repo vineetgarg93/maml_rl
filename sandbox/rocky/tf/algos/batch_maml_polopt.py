@@ -120,6 +120,9 @@ class BatchMAMLPolopt(RLAlgorithm):
         else:
             self.policy = self.adv_policy
             self.baseline = self.adv_baseline
+        self.start_worker()
+        self.init_opt()
+        self.saver = tf.train.Saver()
 
     def start_worker(self):
         self.sampler.start_worker()
@@ -141,26 +144,47 @@ class BatchMAMLPolopt(RLAlgorithm):
         return self.sampler.process_samples(itr, paths, prefix=prefix, log=log)
 
     def train(self):
+        self.rews = []
+        
         # TODO - make this a util
         flatten_list = lambda l: [item for sublist in l for item in sublist]
 
         with tf.Session() as sess:
+            
             # Code for loading a previous policy. Somewhat hacky because needs to be in sess.
             if self.load_policy is not None:
                 import joblib
                 self.policy = joblib.load(self.load_policy)['policy']
-            self.init_opt()
-            # initialize uninitialized vars  (only initialize vars that were not loaded)
-            uninit_vars = []
-            for var in tf.global_variables():
-                # note - this is hacky, may be better way to do this in newer TF.
-                try:
-                    sess.run(var)
-                except tf.errors.FailedPreconditionError:
-                    uninit_vars.append(var)
-            sess.run(tf.variables_initializer(uninit_vars))
+            
+            try:
+                if self.is_protagonist:
+                    self.saver.restore(sess, "/home/grads/v/vineet/Desktop/RL_Project/maml_rl/checkpoints/pro/pro.ckpt")
+                else:
+                    self.saver.restore(sess, "/home/grads/v/vineet/Desktop/RL_Project/maml_rl/checkpoints/adv/adv.ckpt")
+            except:
+                uninit_vars = []
+                for var in tf.global_variables():
+                    # note - this is hacky, may be better way to do this in newer TF.
+                    try:
+                        sess.run(var)
+                    except tf.errors.FailedPreconditionError:
+                        uninit_vars.append(var)
+                sess.run(tf.variables_initializer(uninit_vars))
+            
+            
+            
+#            # self.init_opt()
+#            # initialize uninitialized vars  (only initialize vars that were not loaded)
+#            uninit_vars = []
+#            for var in tf.global_variables():
+#                # note - this is hacky, may be better way to do this in newer TF.
+#                try:
+#                    sess.run(var)
+#                except tf.errors.FailedPreconditionError:
+#                    uninit_vars.append(var)
+#            sess.run(tf.variables_initializer(uninit_vars))
 
-            self.start_worker()
+            # self.start_worker()
             start_time = time.time()
             for itr in range(self.start_itr, self.n_itr):
                 itr_start_time = time.time()
@@ -205,6 +229,9 @@ class BatchMAMLPolopt(RLAlgorithm):
                     params = self.get_itr_snapshot(itr, all_samples_data[-1])  # , **kwargs)
                     if self.store_paths:
                         params["paths"] = all_samples_data[-1]["paths"]
+
+                    self.rews.append(self.get_average_reward(all_samples_data[-1]))
+                    
                     logger.save_itr_params(itr, params)
                     logger.log("Saved")
                     logger.record_tabular('Time', time.time() - start_time)
@@ -216,7 +243,7 @@ class BatchMAMLPolopt(RLAlgorithm):
                     # Plotting code is useful for visualizing trajectories across a few different tasks.
                     if False and itr % 2 == 0 and self.env.observation_space.shape[0] <= 4: # point-mass
                         logger.log("Saving visualization of paths")
-                        for ind in range(min(5, self.meta_batch_size)):
+                        for ind in rang/home/grads/v/vineet/Desktop/RL_Project/maml_rl/e(min(5, self.meta_batch_size)):
                             plt.clf()
                             plt.plot(learner_env_goals[ind][0], learner_env_goals[ind][1], 'k*', markersize=10)
                             plt.hold(True)
@@ -263,7 +290,11 @@ class BatchMAMLPolopt(RLAlgorithm):
 
                             plt.legend(['preupdate path', 'postupdate path'], loc=2)
                             plt.savefig(osp.join(logger.get_snapshot_dir(), 'swim1d_prepost_itr'+str(itr)+'_id'+str(ind)+'.pdf'))
-        self.shutdown_worker()
+            if self.is_protagonist:
+                self.saver.save(sess, '/home/grads/v/vineet/Desktop/RL_Project/maml_rl/checkpoints/pro/pro.ckpt')
+            else:
+                self.saver.save(sess, '/home/grads/v/vineet/Desktop/RL_Project/maml_rl/checkpoints/adv/adv.ckpt')
+        # self.shutdown_worker()
 
     
     def get_agent_paths(self, paths, is_protagonist=True):
@@ -318,9 +349,13 @@ class BatchMAMLPolopt(RLAlgorithm):
 
     def get_average_reward(self, paths):
         sum_r = 0.0
-        for p in paths:
-            sum_r +=p['rewards'].sum()
-        return sum_r/len(paths)
+        
+#        for p in paths:
+#            sum_r +=p['rewards'].sum()
+#        return sum_r/len(paths)
+        for meta_task in paths.keys():
+            sum_r += paths[meta_task]['rewards'].sum()
+        return sum_r/(len(paths)*len(paths[meta_task]['rewards']))*self.max_path_length
 
 
     def log_diagnostics(self, paths, prefix):
